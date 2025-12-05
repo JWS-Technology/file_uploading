@@ -3,8 +3,13 @@ const cors = require("cors");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
+const connectDB = require("./db")
+const dotenv = require("dotenv")
+const File = require("./upload.model")
+dotenv.config();
 
 const app = express();
+connectDB();
 
 app.use(cors())
 app.use(express.json({ limit: "200mb" }));
@@ -37,19 +42,32 @@ app.get("/", (req, res) => {
 });
 
 // ========== UPLOAD ROUTE ==========
-app.post("/upload-json", express.json({ limit: "100mb" }), (req, res) => {
+app.post("/upload", express.json({ limit: "100mb" }), async (req, res) => {
     // console.log(req.body)
-    const { fileName, mimeType, data, teamData } = req.body;
+    const { fileName, fileType, data, teamData, fileSize } = req.body;
 
-    console.log(teamData)
+
     if (!data || !fileName) {
         return res.status(400).json({ message: "Missing file or data" });
     }
 
     const buffer = Buffer.from(data, "base64");
     console.log(teamData.teamId)
-    const savePath = path.join(__dirname, "public", "uploads", `${teamData.teamId}_${teamData.teamName}_${fileName}`);
+    const newFileName = `${teamData.teamId}_${teamData.teamName}_${fileName}`;
+    const savePath = path.join(__dirname, "public", "uploads", newFileName);
     fs.writeFileSync(savePath, buffer);
+
+    const uploadFile = await File.create({
+        teamName: teamData.teamName,
+        teamId: teamData.teamId,
+        originalName: fileName, // name uploaded by user
+        fileName: newFileName,     // stored name on server
+        fileType: fileType,     // e.g. image/png
+        size: fileSize,         // file size in bytes
+        path: "uploads/" + path.basename(savePath),
+    })
+
+    console.log(uploadFile)
 
     res.json({
         message: "File uploaded successfully",
